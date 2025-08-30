@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - barato-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - barato-network
+
+  # ASP.NET Core Web API
+  api:
+    build:
+      context: .
+      dockerfile: src/BaratoInventory.API/Dockerfile
+    ports:
+      - "5001:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BaratoInventory;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=true
+      - ConnectionStrings__Redis=redis:6379
+    depends_on:
+      - sqlserver
+      - redis
+    networks:
+      - barato-network
+
+  # Blazor Frontend
+  blazor:
+    build:
+      context: .
+      dockerfile: src/BaratoInventory.Blazor/Dockerfile
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - API_BASE_URL=http://api
+    depends_on:
+      - api
+    networks:
+      - barato-network
+
+volumes:
+  sqlserver_data:
+  redis_data:
+
+networks:
+  barato-network:
+    driver: bridge
